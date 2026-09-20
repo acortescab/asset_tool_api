@@ -1,0 +1,12 @@
+line-length = 120
+
+[lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "W",
+]
+
+[lint.per-file-ignores]
+"tests/*.py" = ["F401"]

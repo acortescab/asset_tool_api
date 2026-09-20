@@ -99,3 +99,17 @@ DELETE /assets/{asset_id}
 ```bash
 pytest -q
 ```
+
+## Docker
+
+Build the image:
+
+```bash
+docker build -t asset-tool-api .
+```
+
+Run the container:
+
+```bash
+docker run -p 8000:8000 asset-tool-api
+```

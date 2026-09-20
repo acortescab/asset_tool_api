@@ -19,7 +19,8 @@ from app.services.s3_client import generate_presigned_upload_url
 router = APIRouter(prefix="/assets", tags=["assets"])
 
 
-def get_db() :
+def get_db():
+    """Provide a database session for each request."""
     db = SessionLocal()
     try:
         yield db
@@ -29,6 +30,7 @@ def get_db() :
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=AssetCreateResponse)
 def create_asset_route(payload: AssetCreate, db: Session = Depends(get_db)):
+    """Create an asset and return a presigned upload URL for the client."""
     asset = create_asset(
         db,
         filename=payload.filename,
@@ -56,6 +58,7 @@ def create_asset_route(payload: AssetCreate, db: Session = Depends(get_db)):
 
 @router.get("", response_model=list[AssetRead])
 def list_assets_route(db: Session = Depends(get_db)):
+    """Return all active assets."""
     assets = list_assets(db)
     return [
         {
@@ -74,6 +77,7 @@ def list_assets_route(db: Session = Depends(get_db)):
 
 @router.get("/{asset_id}", response_model=AssetRead)
 def get_asset_route(asset_id: str, db: Session = Depends(get_db)):
+    """Get a single asset by its identifier."""
     try:
         asset = get_asset_or_404(db, asset_id)
     except ValueError as exc:
@@ -92,6 +96,7 @@ def get_asset_route(asset_id: str, db: Session = Depends(get_db)):
 
 @router.patch("/{asset_id}", response_model=AssetRead)
 def update_asset_route(asset_id: str, payload: AssetUpdate, db: Session = Depends(get_db)):
+    """Update asset data and keep a new version record."""
     try:
         get_asset_or_404(db, asset_id)
     except ValueError as exc:
@@ -119,6 +124,7 @@ def update_asset_route(asset_id: str, payload: AssetUpdate, db: Session = Depend
 
 @router.patch("/{asset_id}/status", response_model=AssetRead)
 def mark_asset_uploaded_route(asset_id: str, db: Session = Depends(get_db)):
+    """Mark the asset as uploaded after the S3 upload completes."""
     try:
         get_asset_or_404(db, asset_id)
     except ValueError as exc:
@@ -139,6 +145,7 @@ def mark_asset_uploaded_route(asset_id: str, db: Session = Depends(get_db)):
 
 @router.get("/{asset_id}/versions", response_model=list[AssetVersionRead])
 def get_versions_route(asset_id: str, db: Session = Depends(get_db)):
+    """Return the version history for an asset."""
     try:
         get_asset_or_404(db, asset_id)
     except ValueError as exc:
@@ -160,6 +167,7 @@ def get_versions_route(asset_id: str, db: Session = Depends(get_db)):
 
 @router.delete("/{asset_id}", status_code=status.HTTP_200_OK)
 def delete_asset_route(asset_id: str, db: Session = Depends(get_db)):
+    """Delete an asset from the active list."""
     try:
         get_asset_or_404(db, asset_id)
     except ValueError as exc:

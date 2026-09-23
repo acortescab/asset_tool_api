@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import uuid4
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Asset, AssetVersion
@@ -19,6 +20,15 @@ def list_assets(db: Session):
     return db.query(Asset).filter(Asset.deleted.is_(False)).order_by(Asset.created_at.desc()).all()
 
 
+def get_next_asset_version(db: Session, asset_id: str) -> int:
+    last_version = (
+        db.query(func.max(AssetVersion.version))
+        .filter(AssetVersion.asset_id == asset_id)
+        .scalar()
+    )
+    return (last_version or 0) + 1
+
+
 def create_asset(db: Session, *, filename: str, content_type: str, metadata: dict) -> Asset:
     asset_id = uuid4().hex
     now = datetime.utcnow()
@@ -29,7 +39,6 @@ def create_asset(db: Session, *, filename: str, content_type: str, metadata: dic
         content_type=content_type,
         asset_metadata=metadata or {},
         status="uploading",
-        version=1,
         created_at=now,
         updated_at=now,
     )
@@ -80,12 +89,12 @@ def update_asset(
     if status is not None:
         asset.status = status
 
-    asset.version = (asset.version or 0) + 1
+    next_version = get_next_asset_version(db, asset.id)
     asset.updated_at = datetime.utcnow()
 
     version_record = AssetVersion(
         asset_id=asset.id,
-        version=asset.version,
+        version=next_version,
         filename=asset.filename,
         content_type=asset.content_type,
         asset_metadata=asset.asset_metadata,

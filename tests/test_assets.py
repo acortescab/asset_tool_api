@@ -7,6 +7,7 @@ os.environ["DATABASE_URL"] = "sqlite:///./test_assets.db"
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.models import Asset, AssetVersion
 
 client = TestClient(app)
 
@@ -87,6 +88,11 @@ def test_update_asset_creates_new_version():
     versions = history_response.json()
     assert len(versions) >= 2
     assert versions[0]["version"] == 1
+
+
+def test_version_is_generated_from_history_not_stored_twice():
+    assert "version" not in Asset.__table__.columns
+    assert "version" in AssetVersion.__table__.columns
 
 
 def test_delete_asset_removes_record():

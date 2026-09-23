@@ -16,12 +16,15 @@ class Asset(Base):
     content_type = Column(String, nullable=False)
     asset_metadata = Column("metadata", JSON, default=dict)
     status = Column(String, default="pending", nullable=False)
-    version = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     deleted = Column(Boolean, default=False, nullable=False)
 
     versions = relationship("AssetVersion", back_populates="asset", cascade="all, delete-orphan")
+
+    @property
+    def version(self) -> int:
+        return max((version.version for version in self.versions), default=0)
 
 
 class AssetVersion(Base):

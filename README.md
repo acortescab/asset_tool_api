@@ -33,67 +33,6 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-## API
-
-### Health
-
-```bash
-GET /health
-```
-
-### Create asset
-
-```bash
-POST /assets
-```
-
-Body example:
-
-```json
-{
-  "filename": "photo.jpg",
-  "content_type": "image/jpeg",
-  "metadata": {
-    "owner": "demo",
-    "category": "marketing"
-  }
-}
-```
-
-Response includes a presigned upload URL and the asset status.
-
-### List assets
-
-```bash
-GET /assets
-```
-
-### Get asset
-
-```bash
-GET /assets/{asset_id}
-```
-
-### Update asset
-
-```bash
-PATCH /assets/{asset_id}
-```
-
-### Mark uploaded
-
-```bash
-PATCH /assets/{asset_id}/status
-```
-
-This is intended for the downstream SQS/Lambda workflow after the client finishes uploading to S3.
-
-### Delete asset
-
-```bash
-DELETE /assets/{asset_id}
-```
-
 ## Testing
 
 ```bash

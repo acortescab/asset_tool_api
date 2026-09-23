@@ -67,6 +67,42 @@ def init_db() -> None:
             if "owner" not in columns:
                 with engine.begin() as connection:
                     connection.execute(text("ALTER TABLE assets ADD COLUMN owner VARCHAR"))
+            # If owner column exists but has a UNIQUE constraint/index, remove it by recreating the table without the constraint.
+            # SQLite doesn't support dropping constraints; perform safe rename/recreate/insert migration if needed.
+            # Detect unique index on owner
+            indexes = inspector.get_indexes("assets")
+            has_unique_owner = any(idx.get("unique") and "owner" in idx.get("column_names", []) for idx in indexes)
+            if has_unique_owner:
+                # Recreate assets table without unique constraint on owner
+                with engine.begin() as connection:
+                    connection.execute(text("ALTER TABLE assets RENAME TO assets_with_unique_owner"))
+                    connection.execute(
+                        text(
+                            """
+                            CREATE TABLE assets (
+                                id VARCHAR PRIMARY KEY,
+                                filename VARCHAR NOT NULL,
+                                content_type VARCHAR NOT NULL,
+                                owner VARCHAR,
+                                metadata JSON,
+                                status VARCHAR NOT NULL,
+                                created_at DATETIME NOT NULL,
+                                updated_at DATETIME NOT NULL,
+                                deleted BOOLEAN NOT NULL DEFAULT 0
+                            )
+                            """
+                        )
+                    )
+                    connection.execute(
+                        text(
+                            """
+                            INSERT INTO assets (id, filename, content_type, owner, metadata, status, created_at, updated_at, deleted)
+                            SELECT id, filename, content_type, owner, metadata, status, created_at, updated_at, deleted
+                            FROM assets_with_unique_owner
+                            """
+                        )
+                    )
+                    connection.execute(text("DROP TABLE assets_with_unique_owner"))
         # Add owner to asset_versions if missing
         if "asset_versions" in inspector.get_table_names():
             av_columns = {column["name"] for column in inspector.get_columns("asset_versions")}

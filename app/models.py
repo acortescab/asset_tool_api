@@ -28,7 +28,7 @@ class Asset(Base):
     id = Column(String, primary_key=True, index=True)
     filename = Column(String, nullable=False)
     content_type = Column(String, nullable=False)
-    owner = Column(String, nullable=True, unique=True)
+    owner = Column(String, nullable=True)
     asset_metadata = Column("metadata", JSON, default=dict)
     status = Column(String, default="pending", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

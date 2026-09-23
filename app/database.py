@@ -54,5 +54,65 @@ def _migrate_legacy_asset_schema() -> None:
 
 
 def init_db() -> None:
+    # Create all models; then ensure simple runtime migrations for SQLite
     Base.metadata.create_all(bind=engine)
+    # For simple legacy migrations (SQLite) run the helper which performs renames/recreates if needed
     _migrate_legacy_asset_schema()
+
+    # After metadata.create_all, ensure owner column exists on assets (simple ALTER TABLE)
+    if DATABASE_URL.startswith("sqlite"):
+        inspector = inspect(engine)
+        if "assets" in inspector.get_table_names():
+            columns = {column["name"] for column in inspector.get_columns("assets")}
+            if "owner" not in columns:
+                with engine.begin() as connection:
+                    connection.execute(text("ALTER TABLE assets ADD COLUMN owner VARCHAR"))
+            # If owner column exists but has a UNIQUE index, remove it by recreating the table
+            # SQLite doesn't support dropping constraints; perform a safe rename/recreate/insert migration.
+            # Detect unique index on owner
+            indexes = inspector.get_indexes("assets")
+            has_unique_owner = any(
+                idx.get("unique") and "owner" in idx.get("column_names", []) for idx in indexes
+            )
+            if has_unique_owner:
+                # Recreate assets table without unique constraint on owner
+                with engine.begin() as connection:
+                    connection.execute(text("ALTER TABLE assets RENAME TO assets_with_unique_owner"))
+                    connection.execute(
+                        text(
+                            """
+                            CREATE TABLE assets (
+                                id VARCHAR PRIMARY KEY,
+                                filename VARCHAR NOT NULL,
+                                content_type VARCHAR NOT NULL,
+                                owner VARCHAR,
+                                metadata JSON,
+                                status VARCHAR NOT NULL,
+                                created_at DATETIME NOT NULL,
+                                updated_at DATETIME NOT NULL,
+                                deleted BOOLEAN NOT NULL DEFAULT 0
+                            )
+                            """
+                        )
+                    )
+                    connection.execute(
+                        text(
+                            """
+                            INSERT INTO assets (
+                                id, filename, content_type, owner, metadata, status, created_at, updated_at, deleted
+                            )
+                            SELECT id, filename, content_type, owner, metadata, status, created_at, updated_at, deleted
+                            FROM assets_with_unique_owner
+                            """
+                        )
+                    )
+                    connection.execute(text("DROP TABLE assets_with_unique_owner"))
+        # Add owner to asset_versions if missing
+        if "asset_versions" in inspector.get_table_names():
+            av_columns = {column["name"] for column in inspector.get_columns("asset_versions")}
+            if "owner" not in av_columns:
+                with engine.begin() as connection:
+                    connection.execute(text("ALTER TABLE asset_versions ADD COLUMN owner VARCHAR"))
+        # Ensure asset_upload_sessions table exists
+        if "asset_upload_sessions" not in inspector.get_table_names():
+            Base.metadata.create_all(bind=engine)

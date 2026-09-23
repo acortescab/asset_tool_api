@@ -18,6 +18,11 @@ Minimal FastAPI service for managing asset upload records and presigned S3 URLs.
 - boto3 for S3 presigned URL generation
 - pytest for tests
 
+# Coverage
+
+![CI](https://github.com/acortescab/asset_tool_api/actions/workflows/pr-checks.yml/badge.svg)
+[![codecov](https://codecov.io/gh/acortescab/asset_tool_api/graph/badge.svg)](https://codecov.io/gh/acortescab/asset_tool_api)
+
 ## Setup
 
 ```bash

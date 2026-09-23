@@ -22,7 +22,7 @@ def test_create_asset_returns_presigned_upload_url():
     payload = {
         "filename": "photo.jpg",
         "content_type": "image/jpeg",
-        "metadata": {"owner": "demo", "category": "marketing"},
+        "metadata": {"owner": "demo@example.com", "category": "marketing"},
     }
 
     response = client.post("/assets", json=payload)
@@ -41,7 +41,7 @@ def test_list_and_get_asset():
         json={
             "filename": "banner.png",
             "content_type": "image/png",
-            "metadata": {"owner": "demo"},
+            "metadata": {"owner": "demo@example.com"},
         },
     )
     asset_id = create_response.json()["asset_id"]
@@ -64,7 +64,7 @@ def test_update_asset_creates_new_version():
         json={
             "filename": "report.pdf",
             "content_type": "application/pdf",
-            "metadata": {"owner": "ops"},
+            "metadata": {"owner": "ops@example.com"},
         },
     )
     asset_id = create_response.json()["asset_id"]
@@ -101,7 +101,7 @@ def test_delete_asset_removes_record():
         json={
             "filename": "delete-me.txt",
             "content_type": "text/plain",
-            "metadata": {"owner": "qa"},
+            "metadata": {"owner": "qa@example.com"},
         },
     )
     asset_id = create_response.json()["asset_id"]

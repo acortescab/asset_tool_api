@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Asset, AssetVersion
+from app.models import Asset, AssetVersion, AssetUploadSession
 
 
 def get_asset_or_404(db: Session, asset_id: str) -> Asset:
@@ -37,6 +37,7 @@ def create_asset(db: Session, *, filename: str, content_type: str, metadata: dic
         id=asset_id,
         filename=filename,
         content_type=content_type,
+        owner=metadata.get("owner") if isinstance(metadata, dict) else None,
         asset_metadata=metadata or {},
         status="uploading",
         created_at=now,
@@ -58,6 +59,24 @@ def create_asset(db: Session, *, filename: str, content_type: str, metadata: dic
     db.commit()
     db.refresh(asset)
     return asset
+
+
+def create_upload_session(db: Session, asset_id: str, upload_id: str, idempotency_key: str | None = None) -> AssetUploadSession:
+    """Create an AssetUploadSession record using an `upload_id` provided by the S3 service."""
+    session = AssetUploadSession(
+        asset_id=asset_id,
+        upload_id=upload_id,
+        parts=[],
+        status="in_progress",
+        # idempotency_key column may not exist; store if present on model
+    )
+    # attach idempotency_key if model has attribute
+    if idempotency_key is not None and hasattr(session, "idempotency_key"):
+        setattr(session, "idempotency_key", idempotency_key)
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return session
 
 
 def get_versions_for_asset(db: Session, asset_id: str):

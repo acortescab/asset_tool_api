@@ -2,28 +2,30 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 
+from app.schemas import (
+    AssetCreate,
+    AssetCreateResponse,
+    AssetRead,
+    AssetUpdate,
+    AssetVersionRead,
+    MultipartStatusResponse,
+    MultipartStatusRequest,
+    PresignedPartResponse,
+    PresignPartRequest,
+    MultipartCompleteRequest,
+    AbortMultipartRequest,
+)
 from app.services.assets_service import (
     create_asset_service,
-    presign_part_service,
-    multipart_status_service,
-    multipart_complete_service,
-    multipart_abort_service,
-    list_assets_service,
-    get_asset_service,
-    update_asset_service,
     delete_asset_service,
+    get_asset_service,
     get_versions_service,
-)
-from app.database import SessionLocal
-from app.schemas import AssetCreate, AssetCreateResponse, AssetRead, AssetUpdate, AssetVersionRead
-from app.services.s3_client import generate_presigned_upload_url
-from app.services.s3_client import generate_presigned_part_url
-from app.services.s3_client import create_multipart_upload
-from app.services.s3_client import complete_multipart_upload
-from app.services.s3_client import abort_multipart_upload
-from app.schemas import (
-    PresignedPartResponse,
-    MultipartStatusResponse,
+    list_assets_service,
+    multipart_abort_service,
+    multipart_complete_service,
+    multipart_status_service,
+    presign_part_service,
+    update_asset_service,
 )
 
 router = APIRouter(prefix="/assets", tags=["assets"])
@@ -55,33 +57,29 @@ def create_asset_route(payload: AssetCreate):
         "upload_id": result.get("upload_id"),
     }
 
-@router.post("/{asset_id}/multipart/parts", response_model=PresignedPartResponse)
-def presign_part(asset_id: str, part_number: int, upload_id: str):
+@router.post("/{asset_id}/multipart/{part_number}", response_model=PresignedPartResponse)
+def presign_part(asset_id: str, part_number: int, payload: PresignPartRequest):
     try:
-        url = presign_part_service(asset_id=asset_id, part_number=part_number, upload_id=upload_id)
+        url = presign_part_service(asset_id=asset_id, part_number=part_number, upload_id=payload.upload_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found") from exc
     return {"part_number": part_number, "presigned_url": url}
 
 
 @router.get("/{asset_id}/multipart/status", response_model=MultipartStatusResponse)
-def multipart_status(asset_id: str, upload_id: str | None = None):
+def multipart_status(asset_id: str, payload: MultipartStatusRequest):
     try:
-        stat = multipart_status_service(asset_id=asset_id, upload_id=upload_id)
+        stat = multipart_status_service(asset_id=asset_id, upload_id=payload.upload_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return stat
 
 
 @router.post("/{asset_id}/multipart/complete")
-def multipart_complete(asset_id: str, payload: dict):
-    """Payload should include `upload_id` and `parts`: [{'PartNumber': n, 'ETag': '...'}, ...]"""
-    upload_id = payload.get("upload_id")
-    parts = payload.get("parts")
-    if not upload_id or not parts:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="upload_id and parts are required")
+def multipart_complete(asset_id: str, payload: MultipartCompleteRequest):
     try:
-        resp = multipart_complete_service(asset_id=asset_id, upload_id=upload_id, parts=parts)
+        parts = [{"ETag": p.etag, "PartNumber": p.part_number} for p in payload.parts]
+        resp = multipart_complete_service(asset_id=asset_id, upload_id=payload.upload_id, parts=parts)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except Exception as exc:
@@ -90,12 +88,9 @@ def multipart_complete(asset_id: str, payload: dict):
 
 
 @router.post("/{asset_id}/multipart/abort")
-def multipart_abort(asset_id: str, payload: dict):
-    upload_id = payload.get("upload_id")
-    if not upload_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="upload_id is required")
+def multipart_abort(asset_id: str, payload: AbortMultipartRequest):
     try:
-        multipart_abort_service(asset_id=asset_id, upload_id=upload_id)
+        multipart_abort_service(asset_id=asset_id, upload_id=payload.upload_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return {"aborted": True}

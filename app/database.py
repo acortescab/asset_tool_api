@@ -53,8 +53,6 @@ def _migrate_legacy_asset_schema() -> None:
         connection.execute(text("DROP TABLE assets_legacy"))
 
 
-
-
 def init_db() -> None:
     # Create all models; then ensure simple runtime migrations for SQLite
     Base.metadata.create_all(bind=engine)

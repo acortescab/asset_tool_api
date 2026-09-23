@@ -96,7 +96,12 @@ def complete_multipart_upload(object_key: str, upload_id: str, parts: list[dict]
         )
         return resp
 
-    return {"Location": f"https://{AWS_S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{object_key}", "Bucket": AWS_S3_BUCKET, "Key": object_key, "ETag": "\"local-etag\""}
+    return {
+        "Location": f"https://{AWS_S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{object_key}",
+        "Bucket": AWS_S3_BUCKET,
+        "Key": object_key,
+        "ETag": '"local-etag"',
+    }
 
 
 def abort_multipart_upload(object_key: str, upload_id: str) -> None:

@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Asset, AssetVersion, AssetUploadSession
+from app.models import Asset, AssetUploadSession, AssetVersion
 
 
 def get_asset_or_404(db: Session, asset_id: str) -> Asset:
@@ -21,11 +21,7 @@ def list_assets(db: Session):
 
 
 def get_next_asset_version(db: Session, asset_id: str) -> int:
-    last_version = (
-        db.query(func.max(AssetVersion.version))
-        .filter(AssetVersion.asset_id == asset_id)
-        .scalar()
-    )
+    last_version = db.query(func.max(AssetVersion.version)).filter(AssetVersion.asset_id == asset_id).scalar()
     return (last_version or 0) + 1
 
 
@@ -61,7 +57,9 @@ def create_asset(db: Session, *, filename: str, content_type: str, metadata: dic
     return asset
 
 
-def create_upload_session(db: Session, asset_id: str, upload_id: str, idempotency_key: str | None = None) -> AssetUploadSession:
+def create_upload_session(
+    db: Session, asset_id: str, upload_id: str, idempotency_key: str | None = None
+) -> AssetUploadSession:
     """Create an AssetUploadSession record using an `upload_id` provided by the S3 service."""
     session = AssetUploadSession(
         asset_id=asset_id,
@@ -80,13 +78,15 @@ def create_upload_session(db: Session, asset_id: str, upload_id: str, idempotenc
 
 
 def get_versions_for_asset(db: Session, asset_id: str):
-    return (
-        db.query(AssetVersion)
-        .filter(AssetVersion.asset_id == asset_id)
-        .order_by(AssetVersion.version.asc())
-        .all()
-    )
+    return db.query(AssetVersion).filter(AssetVersion.asset_id == asset_id).order_by(AssetVersion.version.asc()).all()
 
+
+def get_upload_session(db: Session, upload_id: str) -> AssetUploadSession | None:
+    return (
+        db.query(AssetUploadSession)
+        .filter(AssetUploadSession.upload_id == upload_id)
+        .first()
+    )
 
 def update_asset(
     db: Session,

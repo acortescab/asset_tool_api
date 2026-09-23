@@ -24,4 +24,3 @@ def test_initiate_multipart_session():
     data = resp.json()
     assert data["upload_mode"] == "multipart"
     assert data["upload_id"] is not None
-

@@ -6,7 +6,6 @@ from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, Str
 from sqlalchemy.orm import relationship
 
 from app.database import Base
-from sqlalchemy import Table, MetaData
 
 
 class AssetUploadSession(Base):
@@ -21,7 +20,6 @@ class AssetUploadSession(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     asset = relationship("Asset")
-
 
 
 class Asset(Base):

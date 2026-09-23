@@ -49,6 +49,29 @@ class InitiateMultipartResponse(BaseModel):
     upload_id: str
 
 
+class PresignPartRequest(BaseModel):
+    upload_id: str
+    part_number: int
+
+
+class MultipartStatusRequest(BaseModel):
+    upload_id: str | None = None
+
+
+class Part(BaseModel):
+    part_number: int = Field(..., alias="PartNumber")
+    etag: str = Field(..., alias="ETag")
+
+
+class MultipartCompleteRequest(BaseModel):
+    upload_id: str
+    parts: list[Part]
+
+
+class AbortMultipartRequest(BaseModel):
+    upload_id: str
+
+
 class PresignedPartResponse(BaseModel):
     part_number: int
     presigned_url: str

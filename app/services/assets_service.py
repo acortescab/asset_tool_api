@@ -1,21 +1,25 @@
 from __future__ import annotations
 
 from typing import Any
-from datetime import datetime
 
+from app import config, crud
 from app.database import SessionLocal
-from app import config
 from app.services.s3_client import (
-    create_multipart_upload,
-    generate_presigned_upload_url,
-    generate_presigned_part_url,
-    complete_multipart_upload,
     abort_multipart_upload,
+    complete_multipart_upload,
+    create_multipart_upload,
+    generate_presigned_part_url,
+    generate_presigned_upload_url,
 )
-from app import crud
 
 
-def create_asset_service(filename: str, content_type: str, metadata: dict[str, Any], upload_mode: str | None = None, file_size: int | None = None) -> dict:
+def create_asset_service(
+    filename: str,
+    content_type: str,
+    metadata: dict[str, Any],
+    upload_mode: str | None = None,
+    file_size: int | None = None,
+) -> dict:
     db = SessionLocal()
     try:
         asset = crud.create_asset(db, filename=filename, content_type=content_type, metadata=metadata)
@@ -34,11 +38,13 @@ def create_asset_service(filename: str, content_type: str, metadata: dict[str, A
             upload_id = multipart["upload_id"]
             upload_mode_out = multipart["upload_mode"]
         else:
-            upload_url = generate_presigned_upload_url(object_key=f"{asset.id}/{asset.filename}", content_type=asset.content_type)
+            upload_url = generate_presigned_upload_url(
+                object_key=f"{asset.id}/{asset.filename}", content_type=asset.content_type
+            )
 
         # Compute current version without triggering lazy loads on a detached instance
         current_version = crud.get_next_asset_version(db, asset.id) - 1
-        # Serialize asset into a plain object to avoid DetachedInstanceError after closing session
+        # Serialize asset into a plain object
         asset_obj = {
             "id": asset.id,
             "filename": asset.filename,
@@ -59,6 +65,7 @@ def create_asset_service(filename: str, content_type: str, metadata: dict[str, A
     finally:
         db.close()
 
+
 def multipart_initiate_service(asset, db) -> dict:
     object_key = f"{asset.id}/{asset.filename}"
     upload_id = create_multipart_upload(object_key=object_key, content_type=asset.content_type)
@@ -67,11 +74,14 @@ def multipart_initiate_service(asset, db) -> dict:
     return {"upload_id": upload_id, "upload_mode": "multipart"}
 
 
-def presign_part_service(asset_id: str, part_number: int, upload_id: str) -> str:
+def presign_part_service(asset_id: str, upload_id: str, part_number: int, ) -> str:
     db = SessionLocal()
     try:
-        asset = crud.get_asset_or_404(db, asset_id)
-        object_key = f"{asset.id}/{asset.filename}"
+        session = crud.get_upload_session(db, upload_id)
+        if session is None or session.asset_id != asset_id:
+            raise ValueError("Upload session not found")
+
+        object_key = f"{session.asset.id}/{session.asset.filename}"
         return generate_presigned_part_url(object_key=object_key, upload_id=upload_id, part_number=part_number)
     finally:
         db.close()
@@ -101,7 +111,9 @@ def multipart_complete_service(asset_id: str, upload_id: str, parts: list[dict])
         # mark asset uploaded
         updated = crud.mark_asset_uploaded(db, asset_id)
         # update session status
-        db.query(crud.AssetUploadSession).filter(crud.AssetUploadSession.asset_id == asset_id, crud.AssetUploadSession.upload_id == upload_id).update({"status": "completed"})
+        db.query(crud.AssetUploadSession).filter(
+            crud.AssetUploadSession.asset_id == asset_id, crud.AssetUploadSession.upload_id == upload_id
+        ).update({"status": "completed"})
         db.commit()
         return {"asset_id": updated.id, "status": updated.status, "s3_response": resp}
     finally:
@@ -117,7 +129,9 @@ def multipart_abort_service(asset_id: str, upload_id: str) -> bool:
             abort_multipart_upload(object_key=object_key, upload_id=upload_id)
         except Exception:
             pass
-        db.query(crud.AssetUploadSession).filter(crud.AssetUploadSession.asset_id == asset_id, crud.AssetUploadSession.upload_id == upload_id).update({"status": "aborted"})
+        db.query(crud.AssetUploadSession).filter(
+            crud.AssetUploadSession.asset_id == asset_id, crud.AssetUploadSession.upload_id == upload_id
+        ).update({"status": "aborted"})
         db.commit()
         return True
     finally:
@@ -176,23 +190,29 @@ def get_versions_service(asset_id: str):
         versions = crud.get_versions_for_asset(db, asset_id)
         out = []
         for v in versions:
-            out.append({
-                "version": v.version,
-                "filename": v.filename,
-                "content_type": v.content_type,
-                "asset_metadata": v.asset_metadata,
-                "status": v.status,
-                "created_at": v.created_at,
-            })
+            out.append(
+                {
+                    "version": v.version,
+                    "filename": v.filename,
+                    "content_type": v.content_type,
+                    "asset_metadata": v.asset_metadata,
+                    "status": v.status,
+                    "created_at": v.created_at,
+                }
+            )
         return out
     finally:
         db.close()
 
 
-def update_asset_service(asset_id: str, filename: str | None, content_type: str | None, metadata: dict | None, status: str | None):
+def update_asset_service(
+    asset_id: str, filename: str | None, content_type: str | None, metadata: dict | None, status: str | None
+):
     db = SessionLocal()
     try:
-        updated = crud.update_asset(db, asset_id, filename=filename, content_type=content_type, metadata=metadata, status=status)
+        updated = crud.update_asset(
+            db, asset_id, filename=filename, content_type=content_type, metadata=metadata, status=status
+        )
         # compute current version without lazy-loading relationship after session closed
         ver = crud.get_next_asset_version(db, updated.id) - 1
         return {
